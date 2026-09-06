@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "02125c15cb88",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "BUILDATHON.md",
+    "PLAN.md",
+    "docs/graph-findings/cross-repo-test-matrix.txt",
+    "docs/graph-findings/curveball-cross-repo-generality.txt",
+    "docs/graph-findings/curveball-gate-on-self.txt",
+    "docs/graph-findings/curveball-impact.txt",
+    "docs/graph-findings/curveball-resolution-distribution.txt",
+    "docs/graph-findings/curveball-search.txt",
+    "internal/cli/gate.go",
+    "internal/gate/changeset.go",
+    "internal/gate/changeset_test.go",
+    "internal/gate/coverage.go",
+    "internal/gate/evidence.go",
+    "internal/gate/evidence_test.go",
+    "internal/gate/index.go",
+    "internal/gate/partial_fixture_test.go",
+    "internal/gate/render.go",
+    "internal/gate/risk.go",
+    "internal/gate/types.go",
+    "internal/gate/verdict.go",
+    "internal/gate/verdict_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/02/125c15cb88/0/metadata.json",
+      "transcript": "/02/125c15cb88/0/full.jsonl",
+      "compact_transcript": "/02/125c15cb88/0/transcript.jsonl",
+      "content_hash": "/02/125c15cb88/0/content_hash.txt",
+      "prompt": "/02/125c15cb88/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 78005,
+    "cache_read_tokens": 860017,
+    "output_tokens": 31560,
+    "api_call_count": 13
+  }
+}
