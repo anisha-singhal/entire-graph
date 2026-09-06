@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "5151049c3e83",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 11,
+  "files_touched": [
+    "PLAN.md",
+    "cmd/entire-graph/main.go",
+    "docs/graph-findings/capabilities.json",
+    "docs/graph-findings/orientation-01-semantic-diff.json",
+    "docs/graph-findings/orientation-02-subcommand-dispatch.json",
+    "docs/graph-findings/orientation-03-snapshot-relations.json",
+    "docs/graph-findings/pre-noon-gate-on-self.txt",
+    "docs/graph-findings/relation-histogram.txt",
+    "internal/cli/gate.go",
+    "internal/cli/help.go",
+    "internal/cli/help_test.go",
+    "internal/cli/root.go",
+    "internal/gate/coverage.go",
+    "internal/gate/fixture_test.go",
+    "internal/gate/index.go",
+    "internal/gate/index_test.go",
+    "internal/gate/render.go",
+    "internal/gate/render_test.go",
+    "internal/gate/risk.go",
+    "internal/gate/signals_test.go",
+    "internal/gate/types.go",
+    "internal/gate/verdict.go",
+    "internal/gate/verdict_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/51/51049c3e83/0/metadata.json",
+      "transcript": "/51/51049c3e83/0/full.jsonl",
+      "compact_transcript": "/51/51049c3e83/0/transcript.jsonl",
+      "content_hash": "/51/51049c3e83/0/content_hash.txt",
+      "prompt": "/51/51049c3e83/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 84,
+    "cache_creation_tokens": 60555,
+    "cache_read_tokens": 12149522,
+    "output_tokens": 42774,
+    "api_call_count": 42
+  }
+}
