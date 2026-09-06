@@ -59,6 +59,22 @@ type ChangedEntity struct {
 	ChangeType ChangeType    `json:"change_type"`
 	Dependents int           `json:"dependents"`
 	Coverage   CoverageState `json:"coverage"`
+	// DependentsTier says how far Dependents may be trusted. A count of 0 at
+	// tier Unresolvable is not the same claim as a count of 0 at tier
+	// Confirmed: the first means "we could not look here", the second means
+	// "we looked and nothing depends on this". Collapsing them is the bug the
+	// Track 2 curveball named.
+	DependentsTier EvidenceTier `json:"dependents_tier"`
+	// DependentsProven is how many of Dependents rest on exactly resolved
+	// edges. The revert rule turns on this rather than on DependentsTier: one
+	// proven dependent establishes that a breaking change has dependents at
+	// all, which is the claim being made.
+	DependentsProven int `json:"dependents_proven"`
+	// DependentsCounts is the full breakdown behind the two fields above.
+	DependentsCounts TierCounts `json:"dependents_counts"`
+	// VerifyHint is the command or source location a reader can use to settle
+	// a claim Gate could not confirm. Empty when the evidence is confirmed.
+	VerifyHint string `json:"verify_hint,omitempty"`
 	// CoveringTests names the tests that exercise this entity, bounded by the
 	// collect layer. Empty whenever Coverage is not Verified.
 	CoveringTests []string `json:"covering_tests,omitempty"`
@@ -83,6 +99,13 @@ type Finding struct {
 	// Evidence is the provenance behind Summary — call paths, test names,
 	// co-change ratios — one entry per line of rendered output.
 	Evidence []string `json:"evidence,omitempty"`
+	// Tier says whether this finding rests on proven structure, on inference,
+	// or on a region the graph could not resolve. Only Confirmed findings may
+	// raise a verdict; see Decide.
+	Tier EvidenceTier `json:"tier"`
+	// Verify is how a reader settles the finding themselves when Tier is not
+	// Confirmed — the fallback path the curveball requires.
+	Verify string `json:"verify,omitempty"`
 }
 
 // Availability records which dimensions actually produced evidence.
@@ -137,8 +160,11 @@ type Report struct {
 	Entities  []ChangedEntity `json:"entities"`
 	Findings  []Finding       `json:"findings"`
 	Available Availability    `json:"available"`
-	Verdict   Verdict         `json:"verdict"`
-	ExitCode  int             `json:"exit_code"`
+	// Analysis states how completely the graph could see this change set, so a
+	// partial result is never presented as an authoritative one.
+	Analysis Analysis `json:"analysis"`
+	Verdict  Verdict  `json:"verdict"`
+	ExitCode int      `json:"exit_code"`
 
 	// VerifyCommand is a runnable test invocation covering the changed code,
 	// derived from the repository's own build files. Empty when none could be

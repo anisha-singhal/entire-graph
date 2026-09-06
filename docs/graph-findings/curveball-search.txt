@@ -1,0 +1,97 @@
+1. internal/sem/provider.go:6310-6350 score=34.5544 symbol=graphqlSchemaResolverRelations kind=function focus=6310 signals=body,symbol-name,graph:callers,complete-symbol
+func graphqlSchemaResolverRelations(schemaFields, resolvers map[string][]SymbolRecord) []RelationRecord {
+	var endpoints []string
+	for endpoint := range schemaFields {
+		if len(resolvers[endpoint]) > 0 {
+			endpoints = append(endpoints, endpoint)
+		}
+	}
+	sort.Strings(endpoints)
+	var relations []RelationRecord
+	for _, endpoint := range endpoints {
+		fields := append([]SymbolRecord(nil), schemaFields[endpoint]...)
+		sort.Slice(fields, func(i, j int) bool { return fields[i].ID < fields[j].ID })
+		targets := append([]SymbolRecord(nil), resolvers[endpoint]...)
+		sort.Slice(targets, func(i, j int) bool { return targets[i].ID < targets[j].ID })
+		for _, field := range fields {
+			for _, resolver := range targets {
+				if field.ID == resolver.ID {
+					continue
+				}
+				relations = append(relations, RelationRecord{
+					RecordType:    "relation",
+					FromID:        field.ID,
+					ToID:          resolver.ID,
+					Type:          "CALLS",
+					Confidence:    0.9,
+					Reason:        "GraphQL schema field resolved to local resolver map field",
+					RelationScope: "workspace",
+					Resolution:    "exact",
+					TargetKind:    "symbol",
+					Evidence: []Evidence{{
+						Kind:     "graphql_schema_resolver_match",
+						FilePath: resolver.FilePath,
+						Detail:   endpoint,
+					}},
+					WarningCodes: []string{},
+				})
+			}
+		}
+	}
+	return relations
+}
+
+2. internal/sem/dependents.go:40-63 score=33.5631 symbol=addDependentCountsWithProgress kind=function focus=40 signals=path,body,symbol-name,graph:callers,complete-symbol
+func addDependentCountsWithProgress(ctx context.Context, repo, head string, result *Result, options dependentsScanOptions) error {
+	names := changedReferenceNames(*result)
+	if len(names) == 0 {
+		if options.progress != nil {
+			options.progress(0, 0, "")
+		}
+		return nil
+	}
+
+	index, warnings, err := buildReferenceIndexWithProgress(ctx, repo, head, names, options)
+	if err != nil {
+		return err
+	}
+	result.Warnings = append(result.Warnings, warnings...)
+
+	for fileIndex := range result.Files {
+		for changeIndex := range result.Files[fileIndex].Changes {
+			change := &result.Files[fileIndex].Changes[changeIndex]
+			name := referenceName(*change)
+			change.DependentsCount = len(index[name])
+		}
+	}
+	return nil
+}
+
+3. internal/sem/provider.go:4509 forEachRelation  [body: def forEachRelation]
+4. internal/sem/search.go:4210-4218 score=30.9074 symbol=searchRelationshipCandidate kind=function focus=4210 signals=body,symbol-name,graph:callers,complete-symbol
+func searchRelationshipCandidate(candidate searchCandidate) bool {
+	for _, signal := range candidate.result.Signals {
+		switch signal {
+		case "symbol-usage", "same-container-neighbor", "same-file-bridge":
+			return true
+		}
+	}
+	return false
+}
+
+5. internal/sem/analyze.go:762 AnalyzeGitRangeWithOptions  [body: def AnalyzeGitRangeWithOptions]
+6. internal/cli/neighbors.go:633 edgeForRelation  [body: def edgeForRelation]
+7. internal/sem/erlang.go:182 erlangCallRelations  [body: def erlangCallRelations]
+8. internal/sem/ocaml.go:654 ocamlCallRelations  [body: def ocamlCallRelations]
+COVERING TEST (what hit 1 is supposed to do; not a fix site):
+9. internal/sem/dependents_test.go:633-634 symbol=TestAddDependentCountsBudgetExpiredWarnsAndKeepsResult kind=function focus=633 signals=related:covering-test
+		t.Fatalf("dependents count under expired budget = %d, want 0", got)
+	}
+
+VERIFY: go test ./internal/sem -run '^TestAddDependentCountsBudgetExpiredWarnsAndKeepsResult$'
+  targets internal/sem/dependents_test.go (from go.mod module root + covering test name) tier=narrow
+  run it ONCE after editing; if it fails, fix the code and re-run THIS command.
+  do not build an alternative test harness, hand-assemble a classpath, or re-verify by
+  reverting and reapplying the edit.
+SAME-CONCEPT LITERAL "graphqlSchemaResolverRelations" — 2 in 1 file repo-wide:
+  internal/sem/provider.go:6203 forEachRelation CONSUMER

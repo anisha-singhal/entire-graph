@@ -1,0 +1,100 @@
+══════════ impact: NewIndex ══════════
+Index: cache-miss (17761ms) | Query: 7ms | Total: 17769ms
+Completeness: no parse failures in Go (427 files parsed); 4 elsewhere (JSON 4) cannot affect this answer — see --format json.
+Impact: NewIndex (internal/gate/index.go:66) def=66 span=66-93 [function]
+Blast radius: 14 callers (3 direct, 11 transitive), 1 callee, 6 type consumers, 1 data flow, 0 co-change files, 0 siblings.
+Callers (3 direct, 11 transitive; who breaks if behavior changes):
+- collectGateReport (internal/cli/gate.go:171, def :139)
+- fixtureIndex (internal/gate/fixture_test.go:52, def :51)
+- TestDependentsOrderingIsStableAcrossIndexBuilds (internal/gate/index_test.go:59, def :48) [+1 more call site]
+- runGate (internal/cli/gate.go:117, def :103) [via collectGateReport]
+- TestDependentsRespectsHopDepth (internal/gate/index_test.go:9, def :8) [via fixtureIndex]
+- TestDependentsIgnoresStructuralRelations (internal/gate/index_test.go:30, def :26) [+1 more call site, via fixtureIndex]
+- TestDependentsExcludesTheSubjectItself (internal/gate/index_test.go:41, def :40) [via fixtureIndex]
+- TestResolveDisambiguatesByPath (internal/gate/index_test.go:67, def :66) [via fixtureIndex]
+- TestResolveReturnsNothingForUnknownName (internal/gate/index_test.go:87, def :83) [via fixtureIndex]
+- TestRiskReportsOnlyBreakingChanges (internal/gate/signals_test.go:11, def :5) [via fixtureIndex]
+- TestRiskAnnotatesDependentsOnEveryEntity (internal/gate/signals_test.go:30, def :24) [via fixtureIndex]
+- TestRiskClampsHopsToMax (internal/gate/signals_test.go:49, def :42) [+1 more call site, via fixtureIndex]
+- TestResolveCoverageDistinguishesVerifiedFromUnchecked (internal/gate/signals_test.go:64, def :58) [via fixtureIndex]
+- TestResolveCoverageReportsNoResolverRatherThanUntested (internal/gate/signals_test.go:101, def :78) [via fixtureIndex]
+Callees (1; what it depends on):
+- sort.Strings
+Type consumers (0 in, 6 out; USES_TYPE/PARAM_TYPE/RETURNS_TYPE):
+- -> Symbol (internal/gate/index.go:10) [PARAM_TYPE]
+- -> Symbol (internal/gate/index.go:10) [USES_TYPE]
+- -> Relation (internal/gate/index.go:18) [PARAM_TYPE]
+- -> Relation (internal/gate/index.go:18) [USES_TYPE]
+- -> Index (internal/gate/index.go:57) [RETURNS_TYPE]
+- -> Index (internal/gate/index.go:57) [USES_TYPE]
+Data flows (0 in, 1 out):
+- -> fixtureIndex (internal/gate/fixture_test.go:51)
+Co-change coupling (0; files that historically change with internal/gate/index.go):
+- none
+Same-container siblings (0):
+- none
+
+══════════ impact: Risk ══════════
+Index: cache-miss (17819ms) | Query: 3ms | Total: 17823ms
+Completeness: no parse failures in Go (427 files parsed); 4 elsewhere (JSON 4) cannot affect this answer — see --format json.
+Impact: Risk (internal/gate/risk.go:28) def=28 span=28-76 [function]
+Blast radius: 5 callers (4 direct, 1 transitive), 6 callees, 6 type consumers, 1 data flow, 0 co-change files, 0 siblings.
+Callers (4 direct, 1 transitive; who breaks if behavior changes):
+- collectGateReport (internal/cli/gate.go:172, def :139)
+- TestRiskReportsOnlyBreakingChanges (internal/gate/signals_test.go:11, def :5)
+- TestRiskAnnotatesDependentsOnEveryEntity (internal/gate/signals_test.go:30, def :24)
+- TestRiskClampsHopsToMax (internal/gate/signals_test.go:49, def :42) [+1 more call site]
+- runGate (internal/cli/gate.go:117, def :103) [via collectGateReport]
+Callees (6; what it depends on):
+- fmt.Sprintf
+- sort.Slice
+- Index.Resolve (internal/gate/index.go:99)
+- Index.Dependents (internal/gate/index.go:123)
+- dependentEvidence (internal/gate/risk.go:82)
+- ChangeType.Breaking (internal/gate/types.go:36)
+Type consumers (0 in, 6 out; USES_TYPE/PARAM_TYPE/RETURNS_TYPE):
+- -> Index (internal/gate/index.go:57) [PARAM_TYPE]
+- -> Index (internal/gate/index.go:57) [USES_TYPE]
+- -> ChangedEntity (internal/gate/types.go:56) [PARAM_TYPE]
+- -> ChangedEntity (internal/gate/types.go:56) [USES_TYPE]
+- -> Finding (internal/gate/types.go:79) [RETURNS_TYPE]
+- -> Finding (internal/gate/types.go:79) [USES_TYPE]
+Data flows (0 in, 1 out):
+- -> dependentEvidence (internal/gate/risk.go:82)
+Co-change coupling (0; files that historically change with internal/gate/risk.go):
+- none
+Same-container siblings (0):
+- none
+
+══════════ impact: Decide ══════════
+Index: cache-miss (17390ms) | Query: 3ms | Total: 17393ms
+Completeness: no parse failures in Go (427 files parsed); 4 elsewhere (JSON 4) cannot affect this answer — see --format json.
+Impact: Decide (internal/gate/verdict.go:27) def=27 span=27-49 [function]
+Blast radius: 8 callers (7 direct, 1 transitive), 1 callee, 8 type consumers, 0 data flows, 0 co-change files, 0 siblings.
+Callers (7 direct, 1 transitive; who breaks if behavior changes):
+- collectGateReport (internal/cli/gate.go:166, def :139) [+1 more call site]
+- TestDecideRevertsOnUncheckedBreakingChangeWithDependents (internal/gate/verdict_test.go:17, def :9)
+- TestDecideDoesNotRevertWhenTheBreakingChangeIsCovered (internal/gate/verdict_test.go:30, def :22)
+- TestDecideCapsAtContinueWhenCoverageDidNotRun (internal/gate/verdict_test.go:49, def :35)
+- TestDecideCapsAtContinueWhenRiskDidNotRun (internal/gate/verdict_test.go:65, def :58)
+- TestDecideIsUnusableWhenNoDimensionProducedEvidence (internal/gate/verdict_test.go:77, def :71)
+- TestDecideContinuesOnAnyUncheckedEntity (internal/gate/verdict_test.go:95, def :86)
+- runGate (internal/cli/gate.go:117, def :103) [via collectGateReport]
+Callees (1; what it depends on):
+- ChangeType.Breaking (internal/gate/types.go:36)
+Type consumers (0 in, 8 out; USES_TYPE/PARAM_TYPE/RETURNS_TYPE):
+- -> ChangedEntity (internal/gate/types.go:56) [PARAM_TYPE]
+- -> ChangedEntity (internal/gate/types.go:56) [USES_TYPE]
+- -> Finding (internal/gate/types.go:79) [PARAM_TYPE]
+- -> Finding (internal/gate/types.go:79) [USES_TYPE]
+- -> Availability (internal/gate/types.go:95) [PARAM_TYPE]
+- -> Availability (internal/gate/types.go:95) [USES_TYPE]
+- -> Verdict (internal/gate/types.go:105) [RETURNS_TYPE]
+- -> Verdict (internal/gate/types.go:105) [USES_TYPE]
+Data flows (0 in, 0 out):
+- none
+Co-change coupling (0; files that historically change with internal/gate/verdict.go):
+- none
+Same-container siblings (0):
+- none
+

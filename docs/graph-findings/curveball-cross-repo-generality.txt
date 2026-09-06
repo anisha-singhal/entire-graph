@@ -1,0 +1,36 @@
+Cross-repository check that Gate's decision tables are provider-level,
+not tuned to any one repository. Measured on three repositories, two
+languages, with the same binary.
+
+=== entire-graph (Go, our own) ===
+     31704 (52.8%)  exact
+      8253 (13.7%)  import_external
+      7258 (12.1%)  package
+      5254 ( 8.7%)  name_only
+      4231 ( 7.0%)  pattern
+      2618 ( 4.4%)  type_inferred
+       746 ( 1.2%)  import_resolved
+   entry-point relations: {'HANDLES_TOOL': 18, 'HANDLES_ROUTE': 49}
+=== gorilla/mux (Go) ===
+      1017 (57.0%)  exact
+       248 (13.9%)  name_only
+       147 ( 8.2%)  type_inferred
+       146 ( 8.2%)  import_external
+       137 ( 7.7%)  package
+        77 ( 4.3%)  pattern
+        11 ( 0.6%)  import_resolved
+   entry-point relations: {'HANDLES_ROUTE': 43}
+=== pallets/flask (Python) ===
+      3389 (48.8%)  exact
+       963 (13.9%)  pattern
+       949 (13.7%)  import_external
+       744 (10.7%)  name_only
+       678 ( 9.8%)  import_resolved
+       217 ( 3.1%)  type_inferred
+        10 ( 0.1%)  package
+   entry-point relations: {'HANDLES_TOOL': 3, 'HANDLES_ROUTE': 509}
+
+Same seven resolution strings in every repository, in comparable
+proportions, across both languages. The tier mapping keys on these
+provider-level strings, so it carries to any repository the provider can
+parse. Entry-point relations appear in all three.

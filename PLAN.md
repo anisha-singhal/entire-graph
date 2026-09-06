@@ -48,7 +48,11 @@ Every finding Gate emits comes from an artifact, never from an assertion.
 That single sentence is the product. An agent cannot make Gate say `keep` by describing its work
 well, because Gate never reads the description. This is also why the tool can block a push: a
 reviewer that changes its mind is not a gate, and anything with a model in the loop changes its
-mind. Run Gate twice on the same commit and diff the bytes — they are identical.
+mind. Run Gate twice on the same commit and the *decision* is identical every time — verdict,
+exit code, entity count and every header count. The bytes are not quite: an upstream map
+iteration flips a few entities between `added` and `renamed`, which can open or close one risk
+finding (measured: 17 differing lines of 173 over five runs). See §14 — the claim is
+reproducibility of the verdict, not of the transcript.
 
 The second half of the idea is **absence**. Every other review tool reports what it found. Gate
 reports what nobody looked at — where "nobody" means the agent, the developer, and the test
@@ -451,8 +455,9 @@ not nonsense. Two signals working beats four half-working.
 
 **Not deferred — the pre-push hook is demo-critical.** §13 opens on a refused `git push`; that
 beat cannot depend on something in this list. It is ~5 lines of shell wrapping the exit code, and
-it must exist and be rehearsed by 14:40. If it slips, the opening beat becomes the byte-identical
-`--json | shasum` instead — decide that consciously, not at 2:55.
+it must exist and be rehearsed by 14:40. If it slips, the opening beat becomes the `EVIDENCE`
+section — the tiers and the blind-spot listing — instead. **Do not fall back to
+`--json | shasum`:** the bytes are not identical run to run (§14), so that beat fails live.
 
 1. `UNASSERTED` third coverage state — reimplement assertion detection in `internal/gate` (~25 lines).
    Not free: `searchCoveringTestBodyAsserts` is unexported, used only as a filter for weak
@@ -586,6 +591,12 @@ a compiler toolchain.
 
 ### Done — with the command that proves each
 
+> **Superseded 2026-09-06 ~13:30.** The numbers in this subsection are the
+> pre-curveball snapshot and are kept as the dated record they are. Current:
+> **12** dependency edge types (`DATA_FLOWS` was removed — see §14), **517**
+> entities on `HEAD~3..HEAD` after prose filtering, **56 tests / 84.2%**.
+> §12b and BUILDATHON.md §6–§8 are the live account.
+
 - `entire graph gate --base <ref> --head <ref>` and `--checkpoint <id>`
   (the latter is nearly free: `sem.AnalyzeCheckpoint` already existed)
 - **risk** — reverse dependency walk over 13 edge types, depth ≤2, `--hops 1|2`
@@ -699,6 +710,170 @@ request; they are recoverable from the reflog as `ca1bad4` (this plan) and
 Whoever reads this should establish the baseline commit before editing, so the
 curveball response has something to diff against.
 
+---
+
+## 12b. CURVEBALL — Track 2: "Graph is evidence, not an oracle"
+
+Received 12:00 IST 2026-09-06. Written **before** any code was edited; the graph
+evidence below was gathered before the first edit, not after.
+
+### Constraint, verbatim
+
+> Your Graph-powered experience has encountered a repository using dynamic dispatch, generated
+> code, reflection, or another pattern that static analysis cannot fully resolve.
+> - The product must not present incomplete Graph relationships as certain.
+> - It must identify when analysis may be partial.
+> - It must provide a safe fallback or verification path.
+> - Existing behaviour for fully resolved code must continue to work.
+> - You must include a test or fixture representing incomplete analysis.
+>
+> Users and agents must be able to tell apart: confirmed structural evidence · heuristic or
+> incomplete evidence · claims that require source or test verification.
+
+### The assumption it invalidates — one sentence
+
+**Gate assumed a graph edge is a fact and the absence of a graph edge is the absence of a
+dependency** — so every number it printed carried the same authority, whether the provider had
+resolved it exactly or guessed it.
+
+That assumption is load-bearing in two directions, and the second is the dangerous one:
+
+1. **Present edges were over-trusted.** `156 dependents` was printed as a count, not an estimate.
+2. **Absent edges were read as safety.** An entity reached only through dynamic dispatch,
+   reflection or generated code resolves to *zero* dependents — and zero dependents is exactly
+   the condition under which Gate stays quiet and returns `keep`. Gate was at its most confident
+   precisely where the graph was blindest. A tool whose entire pitch is *"we report what nobody
+   checked"* was silently converting *"we could not see"* into *"there is nothing there"*.
+
+Note that §14 already disclosed "dependent counts are heuristic" in prose. The curveball's point
+is that a limitation admitted in a README and not represented in the data model is not a
+disclosure — it is a footnote under a number the tool still prints with full authority.
+
+### Where the assumption physically lives — found with the graph, before editing
+
+`entire graph search --profile full --query "code that consumes graph relationship evidence..."`
+then `entire graph impact` on each consumer. Saved: `docs/graph-findings/curveball-search.txt`,
+`docs/graph-findings/curveball-impact.txt`.
+
+The provider is **not** the problem — it already tells the truth. `sem.RelationRecord` carries
+`Confidence`, `Resolution`, `Reason`, `Evidence[]` and `WarningCodes[]`
+(`internal/sem/provider.go:6310` emits `Confidence: 0.9, Resolution: "exact"` with an evidence
+record attached).
+
+Gate throws all of it away, on **one line**:
+
+```go
+internal/cli/gate.go:263
+relations = append(relations, gate.Relation{FromID: r.FromID, ToID: r.ToID, Type: r.Type})
+```
+
+because the contract it projects onto has nowhere to put it:
+
+```go
+internal/gate/index.go:18
+type Relation struct { FromID, ToID, Type string }   // Confidence, Resolution, Evidence: dropped
+```
+
+**Gate was structurally incapable of distinguishing confirmed from heuristic evidence.** Not a
+rendering omission — a missing field.
+
+### Blast radius, from `entire graph impact` (run before editing)
+
+| Symbol | Callers | Verdict |
+|---|---|---|
+| `NewIndex` (`internal/gate/index.go:66`) | 14 (3 direct, 11 transitive) | contract change reaches every signal test via `fixtureIndex` |
+| `Risk` (`internal/gate/risk.go:28`) | 5 (4 direct) | consumes `Index.Dependents` — must carry tier through |
+| `Decide` (`internal/gate/verdict.go:27`) | 7 (6 direct) | the monotonicity rule lands here |
+
+Type consumers confirm the contract is the hinge: `NewIndex` alone has 6 `USES_TYPE`/`PARAM_TYPE`
+edges onto `Symbol`, `Relation` and `Index`. `Relation` is the type to change.
+
+### What stays intact
+
+`Decide`'s existing degradation branch is already the right shape — *a dimension that did not run
+cannot produce a finding against you*. The curveball is the same principle applied one level down:
+**evidence that could not be resolved cannot produce a finding against you either.** The revision
+extends an existing invariant rather than introducing a new one, which is why fully-resolved
+repositories keep their current behaviour byte for byte.
+
+### What changed
+
+Five layers touched, one new file, no layer boundary moved. The signal/verdict
+split held: nothing here required rewriting how Gate works, only what it is
+willing to claim.
+
+| Layer | Change |
+|---|---|
+| contract (`evidence.go`, new) | `EvidenceTier` = confirmed / heuristic / unresolvable; `TierCounts`; `Analysis` |
+| index (`index.go`) | `Relation` carries `Confidence` + `Resolution`; the walk tags every dependent with the weakest tier on the path that reached it; `MarkPartial` records regions the provider admitted it could not analyse |
+| signals (`risk.go`) | findings carry a tier and a `verify:` command; an unresolvable region now produces a finding **even with zero dependents** |
+| verdict (`verdict.go`) | revert requires at least one *proven* dependent; an unresolvable entity can no longer reach `keep`; new `EVIDENCE` block in the printed rule |
+| render (`render.go`) | tier markers, `EVIDENCE` section naming the files analysis could not complete, `PARTIAL ANALYSIS` banner above every count |
+| collect (`internal/cli/gate.go`) | stops dropping `Confidence`/`Resolution`; derives partial regions from parse failures and inventory-only languages |
+
+**Two mistakes made and corrected while building it**, both caught by running
+Gate on this repository rather than on the fixtures:
+
+1. **The first tier mapping keyed on `confidence >= 0.9`.** Measured against the
+   real snapshot (`docs/graph-findings/curveball-resolution-distribution.txt`),
+   `exact` edges carry confidences of 1, 0.92, 0.85 *and* 0.7 — so the threshold
+   demoted 6,737 genuinely exact edges and made almost every finding read
+   "inferred". The provider's resolution *method* now decides the tier, with
+   confidence only as a floor. A tool that marks everything uncertain has not
+   become more honest; it has moved the noise.
+2. **Reporting only the weakest edge crossed.** A walk over 232 dependents
+   almost certainly crosses one name-matched edge, so the marker fired on
+   exactly the high-fan-out symbols that most need a trustworthy number. The
+   count is now a composition — `232 dependents (2 proven, 230 inferred)` — and
+   the revert rule turns on whether *any* dependent is proven, since one proven
+   dependent establishes the claim "this breaking change has dependents".
+
+### What stayed intact
+
+- **All 27 pre-curveball tests still pass, unmodified in substance.** One
+  fixture in `verdict_test.go` gained an explicit `DependentsTier: Confirmed`;
+  its assertion is unchanged. That fixture always described fully resolved code
+  and now says so.
+- **A fully resolved repository renders exactly as before** — bare counts, no
+  markers, no `EVIDENCE` section. Pinned by
+  `TestFullyResolvedRepositoryIsUnaffectedByTiering` and
+  `TestEvidenceSectionIsAbsentWhenAnalysisIsComplete`.
+- The layer boundaries, the `collect`-is-the-only-impure-layer rule, and the
+  no-`internal/sem`-import rule are untouched.
+- Coverage went **78.9% → 84.2%**, and the gate suite from **27 to 56 tests**.
+
+### Why the new result can be trusted
+
+The revision extends an invariant Gate already had rather than adding a new one.
+`Decide` already refused to let a *missing dimension* raise a verdict; it now
+refuses to let *unproven evidence* raise one either. Both are the same rule:
+**Gate may only accuse on the strength of what it can actually show.**
+
+Concretely, three claims are now distinguishable everywhere they appear — in the
+text report, in `--json`, and in the verdict logic:
+
+| | means | may reach revert? |
+|---|---|---|
+| `confirmed` | the provider resolved it exactly | yes |
+| `~ heuristic` | inferred — a name, shape or package match | no, caps at continue |
+| `? unresolvable` | the graph could not look here at all | no, and always reported |
+
+And the failure mode that started this is closed by a test: an entity whose
+callers are invisible to static analysis used to render `0 dependents` and reach
+`keep`. It now renders `dependents unresolvable (graph could not see this
+region)`, produces a finding with a `verify:` command, and caps the verdict at
+`continue`
+(`TestUnresolvableRegionIsNotReportedAsZeroDependents`,
+`TestUnresolvableEntityCannotReachKeep`).
+
+### Evidence
+
+- `docs/graph-findings/curveball-search.txt` — the pre-edit locate query
+- `docs/graph-findings/curveball-impact.txt` — pre-edit impact on `NewIndex`, `Risk`, `Decide`
+- `docs/graph-findings/curveball-resolution-distribution.txt` — the measurement that recalibrated the tier mapping
+- `docs/graph-findings/curveball-gate-on-self.txt` — Gate's own post-revision output on this repository
+
+
 ## 13. Demo (90 seconds)
 
 **Pre-warm the cache before demoing** (`entire graph index --repo . --head --profile full`).
@@ -708,7 +883,9 @@ fallback asset.
 1. `git push` — **refused**. Verdict on screen. *(Requires the pre-push hook — see §11.)*
 2. Point at an `unchecked` symbol with 14 dependents. *Nobody looked at this.*
 3. `gate --explain 2` → the call path → judge opens the file → it is true.
-4. `gate --json | shasum` twice → identical bytes.
+4. Run it twice → the verdict, exit code and every header count are identical. Say plainly that
+   the bytes are not, and why: an upstream map iteration we found by running Gate on ourselves
+   and chose to disclose rather than paper over. **Do not demo `--json | shasum`** — it fails.
 5. Close: *"Every one of those findings came from the graph, git history, and the test tree.
    Gate never asked the agent what it did."*
 

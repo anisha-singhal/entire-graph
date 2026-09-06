@@ -12,6 +12,13 @@ func TestDecideRevertsOnUncheckedBreakingChangeWithDependents(t *testing.T) {
 		ChangeType: SignatureChanged,
 		Dependents: 14,
 		Coverage:   Unchecked,
+		// This fixture always described fully resolved code; since the Track 2
+		// revision it has to say so. The unset tier is deliberately NOT treated
+		// as confirmed: letting absent information mean confidence is the exact
+		// failure that revision exists to prevent, and Gate must not commit it
+		// in its own type system. The assertion below is unchanged.
+		DependentsTier:   Confirmed,
+		DependentsCounts: TierCounts{ConfirmedCount: 14, Region: Confirmed},
 	}}
 
 	if got := Decide(entities, nil, allAvailable()); got != Revert {

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/entireio/entire-graph/internal/gate"
 	"github.com/entireio/entire-graph/internal/sem"
@@ -142,7 +143,11 @@ func collectGateReport(ctx context.Context, repo, version string, flags gateFlag
 		return gate.Report{}, err
 	}
 
-	entities := changedEntities(result)
+	// Prose entities are dropped before any signal runs, and the count is
+	// reported rather than swallowed. Narrowing the scope of a review tool
+	// without saying so is the same category of dishonesty as overstating its
+	// confidence; see gate.PartitionProse for why they have to go.
+	entities, prose := gate.PartitionProse(changedEntities(result))
 	report := gate.Report{
 		Base:       result.Base,
 		Head:       result.Head,
@@ -163,22 +168,56 @@ func collectGateReport(ctx context.Context, repo, version string, flags gateFlag
 		// change. Report what the diff alone can say and let the verdict
 		// degrade to unusable rather than accusing the author.
 		report.Warnings = append(report.Warnings, "graph unavailable: "+err.Error())
+		if note := scopeNote(prose, 0); note != "" {
+			report.Warnings = append(report.Warnings, note)
+		}
 		report.Verdict = gate.Decide(report.Entities, nil, gate.Availability{})
 		report.ExitCode = report.Verdict.ExitCode()
 		return report, nil
 	}
 
 	index := gate.NewIndex(projectSymbols(snapshot), projectRelations(snapshot))
+	inert := markPartialAnalysis(index, snapshot)
+	if note := scopeNote(prose, inert); note != "" {
+		report.Warnings = append(report.Warnings, note)
+	}
 	risk := gate.Risk(report.Entities, index, flags.hops)
-	gate.ResolveCoverage(report.Entities, index, snapshotHasTests(snapshot))
+	// One filesystem-shaped question, asked once. It is answered by scanning
+	// every file record in the snapshot, and it was previously asked twice.
+	hasTests := snapshotHasTests(snapshot)
+	gate.ResolveCoverage(report.Entities, index, hasTests)
 	coverage := gate.Coverage(report.Entities)
 
 	report.Findings = append(risk, coverage...)
-	report.Available = gate.Availability{Risk: true, Coverage: snapshotHasTests(snapshot)}
+	report.Available = gate.Availability{Risk: true, Coverage: hasTests}
+	partialPaths, partialReasons := index.PartialPaths()
+	report.Analysis = gate.SummariseEvidence(report.Entities, partialPaths, partialReasons)
 	report.Verdict = gate.Decide(report.Entities, report.Findings, report.Available)
 	report.ExitCode = report.Verdict.ExitCode()
 	report.VerifyCommand = verifyCommand(repo)
 	return report, nil
+}
+
+// scopeNote states, in one line, everything Gate declined to analyse and why.
+//
+// One line rather than two because writeWarnings collapses warnings sharing a
+// leading code, so a second "SCOPE ..." would be swallowed as "(and 1 more)" —
+// that collapse exists for one parse error repeated across five vendored
+// grammars, not for two different facts. Reporting a narrowed scope and then
+// hiding half of it behind a counter would be its own small dishonesty.
+func scopeNote(prose, inert int) string {
+	var parts []string
+	if prose > 0 {
+		parts = append(parts, fmt.Sprintf("%d documentation entities (whole documents, headings, fenced blocks)", prose))
+	}
+	if inert > 0 {
+		parts = append(parts, fmt.Sprintf("%d data and prose files", inert))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "SCOPE not analysed: " + strings.Join(parts, " and ") +
+		". Neither can carry a code relation in either direction, so silence about them is not a blind spot."
 }
 
 // gateWarning renders a provider warning as one line. The completeness effect
@@ -252,6 +291,7 @@ func projectSymbols(snapshot sem.ProviderSnapshot) []gate.Symbol {
 	for _, s := range snapshot.Symbols {
 		symbols = append(symbols, gate.Symbol{
 			ID: s.ID, Name: s.Name, Path: s.FilePath, Line: s.StartLine, Kind: s.Kind,
+			QualifiedName: s.QualifiedName,
 		})
 	}
 	return symbols
@@ -260,7 +300,17 @@ func projectSymbols(snapshot sem.ProviderSnapshot) []gate.Symbol {
 func projectRelations(snapshot sem.ProviderSnapshot) []gate.Relation {
 	relations := make([]gate.Relation, 0, len(snapshot.Relations))
 	for _, r := range snapshot.Relations {
-		relations = append(relations, gate.Relation{FromID: r.FromID, ToID: r.ToID, Type: r.Type})
+		// Confidence and Resolution are carried through rather than dropped.
+		// Dropping them was the single line that made Gate unable to tell a
+		// proven relationship from an inferred one — the assumption the
+		// Track 2 curveball invalidated.
+		relations = append(relations, gate.Relation{
+			FromID:     r.FromID,
+			ToID:       r.ToID,
+			Type:       r.Type,
+			Confidence: r.Confidence,
+			Resolution: r.Resolution,
+		})
 	}
 	return relations
 }
@@ -295,4 +345,83 @@ func verifyCommand(repo string) string {
 		}
 	}
 	return ""
+}
+
+// markPartialAnalysis tells the index which files the provider could not fully
+// analyse, so that a symbol living in one is reported as unresolvable instead
+// of as confidently unreferenced.
+//
+// Three sources, all of them the provider's own admissions rather than Gate's
+// guesses:
+//
+//   - partial failures: a file the parser could not read. Its call sites do
+//     not exist in the graph at all.
+//   - inventory-only languages: discovered and listed, but never parsed for
+//     relations. A Go function called from a Ruby template has a caller the
+//     graph will never hold.
+//   - a shallow call-resolution profile: the header says so itself, and every
+//     call edge in the snapshot is then weaker than an exact match.
+//
+// Gate previously read all three as "no dependents".
+//
+// It also previously reported every inventory-only file as a blind spot, which
+// buried the real ones: on this repository that produced 94 entries of which
+// exactly 5 were code, the rest being Markdown, JSON, TOML and .gitignore. A
+// .gitignore cannot hide a caller, and a list where 95% of the entries cannot
+// matter is a list a reviewer stops reading — which costs precisely the
+// disclosure the curveball asked for. gate.CanHideACaller draws the line, and
+// the files it excludes are counted and reported rather than dropped in
+// silence.
+//
+// Returns how many files were excluded on that ground.
+func markPartialAnalysis(index *gate.Index, snapshot sem.ProviderSnapshot) (inert int) {
+	// Language by path, so a partial failure can be judged the same way an
+	// inventory-only file is. The provider reports the failure; only the file
+	// record knows what language failed.
+	language := make(map[string]string, len(snapshot.Files))
+	for _, file := range snapshot.Files {
+		language[file.Path] = file.Language
+	}
+
+	for _, failure := range snapshot.Header.PartialFailures {
+		if failure.FilePath == "" {
+			continue
+		}
+		// A parse failure in a data file is not a blind spot. The provider
+		// reports E_MINIFIED against every large JSON document it declines to
+		// tokenise, and four of this repository's own saved graph findings were
+		// being listed as code the graph could not see. The failure is real;
+		// what it implies about hidden callers is nothing.
+		if !gate.CanHideACaller(language[failure.FilePath]) {
+			inert++
+			continue
+		}
+		reason := failure.Code
+		if failure.EffectOnCompleteness != "" {
+			reason = failure.Code + ": " + failure.EffectOnCompleteness
+		}
+		index.MarkPartial(failure.FilePath, reason)
+	}
+
+	inventoryOnly := map[string]bool{}
+	for lang, tier := range snapshot.Header.LanguageTiers {
+		if tier == "inventory-only" {
+			inventoryOnly[lang] = true
+		}
+	}
+	if len(inventoryOnly) == 0 {
+		return inert
+	}
+	for _, file := range snapshot.Files {
+		if !inventoryOnly[file.Language] {
+			continue
+		}
+		if !gate.CanHideACaller(file.Language) {
+			inert++
+			continue
+		}
+		index.MarkPartial(file.Path, fmt.Sprintf("%s %s is inventory-only, so a call from it would leave no edge",
+			gate.NotAnalysedPrefix, file.Language))
+	}
+	return inert
 }

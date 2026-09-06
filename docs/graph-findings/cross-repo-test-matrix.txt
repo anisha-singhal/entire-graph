@@ -1,0 +1,52 @@
+# Gate on external open-source repositories — cross-repo test matrix
+# Captured 2026-09-06 14:11 IST, one binary, --base HEAD~3 --head HEAD.
+# Clones are --depth 25, so change sets are small by construction.
+#
+# Selected so each repo defeats static analysis a DIFFERENT way.
+
+REPO     LANG     FILES   TIME VERDICT   RUNTIME-DISPATCH FILES DETECTED
+------   ----     -----   ---- -------   -------------------------------
+gin      Go         130   2.1s keep      13 (Go reflect in binding/)
+scrapy   Python     680   5.5s continue  27 (importlib/inspect/pkgutil)
+pytest   Python     690   9.6s continue  pluggy hook dispatch
+nest     TS        2307  12.0s continue  decorator DI (reflect-metadata)
+django   Python    7087  30.6s continue  96 (import-by-string, metaclasses)
+
+No crashes, no timeouts, no hangs. Exit codes 0/1 as the verdicts imply.
+
+== What these runs found, that our own repo could not show ==
+
+1. django/utils/module_loading.py:124  qualname
+     dependents could not be resolved (Python dynamic import is imported here)
+     -- the 44 shown is a FLOOR, not a count
+   96 Django files parse perfectly and still cannot be trusted to reveal their
+   callers. This is the Track 2 curveball on the framework whose entire plugin
+   model is import-by-string.
+
+2. gin.go:662  Engine.ServeHTTP -- every HTTP request in the framework goes through it
+     callers resolved: 1, from a benchmark, resolution=type_inferred
+   Production callers arrive via the http.Handler interface and leave no edge.
+   Registration-shaped entry points are detected; dispatch-shaped ones are not.
+   Disclosed in BUILDATHON.md section 8.
+
+== Bugs these repos exposed in Gate (all fixed) ==
+
+pytest+scrapy: entity kind 'document' (a whole .rst file) was missing from the
+  prose filter. doc/en/reference/plugin_list.rst matched a HANDLES_TOOL edge and
+  was reported as 'registered as a tool handler: its callers are external
+  invocations' -- a documentation page described as a live entry point.
+
+django: 96 reflection-flagged files were printed under the heading 'failed to
+  parse'. None had failed to parse. Runtime dispatch now has its own bucket and
+  leads the listing, because it is the one claim only this tool makes.
+
+gin: 9 of 10 changed entities were GitHub Actions workflows and jobs, each
+  reported 'unchecked: no test covers it' at tier CONFIRMED. Gate asserting with
+  full confidence that jobs.trivy-scan has no unit test. Coverage now reports
+  NoResolver for CI/CD kinds -- no jurisdiction, not a defect in the change.
+
+== Known open ==
+
+pytest: 10 of 10 risk findings are deleted test methods from one removed class.
+  A removed entity is always absent from the HEAD snapshot, so 'not in the graph'
+  is a tautology for it, and riskFindingLimit is consumed by restating it.

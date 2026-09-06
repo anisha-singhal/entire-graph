@@ -1,6 +1,9 @@
 package gate
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Rule is printed with every run so the verdict is never a black box. A reader
 // who disagrees with the decision can see the rule that produced it without
@@ -14,7 +17,13 @@ const Rule = `RULE  revert   = a breaking change with >=1 dependent AND no cover
 DEGRADATION  a dimension that did not run cannot produce a finding against you.
              coverage unavailable  -> nothing may reach revert; cap at continue
              risk unavailable      -> cap at continue
-             both unavailable      -> unusable (exit 5)`
+             both unavailable      -> unusable (exit 5)
+
+EVIDENCE     only confirmed structural evidence may raise a verdict.
+             confirmed     proven by the graph            -> may reach revert
+             heuristic ~   inferred, not proven           -> caps at continue
+             unresolvable ?  the graph could not look     -> caps at continue,
+                             and is always reported, never silently passed`
 
 // Decide reduces the annotated entities and their findings to one verdict.
 //
@@ -32,7 +41,14 @@ func Decide(entities []ChangedEntity, findings []Finding, avail Availability) Ve
 	if avail.Risk && avail.Coverage {
 		for _, e := range entities {
 			if e.ChangeType.Breaking() && e.Dependents > 0 && e.Coverage == Unchecked {
-				return Revert
+				// Only confirmed structural evidence may accuse. A dependent
+				// count assembled from inferred edges is a reason to look, not
+				// a reason to roll back, and revert is the one verdict a
+				// reviewer cannot easily argue with. Inference caps at
+				// continue, where the finding is still reported in full.
+				if e.DependentsCounts.Proven() {
+					return Revert
+				}
 			}
 		}
 	}
@@ -42,6 +58,14 @@ func Decide(entities []ChangedEntity, findings []Finding, avail Availability) Ve
 	}
 	for _, e := range entities {
 		if e.Coverage == Unchecked {
+			return Continue
+		}
+		// A clean-looking entity in a region the graph could not resolve is
+		// not a pass. Its zero dependents and its coverage were both read off
+		// a graph that could not see the calls into it, so the quiet result
+		// is an artefact of the blind spot rather than evidence about the
+		// change. Continue, so a human still looks.
+		if e.DependentsTier == Unresolvable {
 			return Continue
 		}
 	}
@@ -61,6 +85,28 @@ func DegradationNote(avail Availability) string {
 		return "risk did not run: dependent counts are absent, so this verdict is capped at continue"
 	}
 	return ""
+}
+
+// EvidenceNote states the report's own limits in one line, so a partial result
+// is never read as an authoritative one. This is the curveball requirement
+// made literal: the tool says what it could not see, in the header, before the
+// reader reaches any number.
+func EvidenceNote(a Analysis) string {
+	if a.Complete() {
+		return ""
+	}
+	var parts []string
+	if a.UnresolvableEntities > 0 {
+		parts = append(parts, fmt.Sprintf("%d in regions the graph could not resolve", a.UnresolvableEntities))
+	}
+	if a.HeuristicEntities > 0 {
+		parts = append(parts, fmt.Sprintf("%d resting on inferred edges", a.HeuristicEntities))
+	}
+	if len(parts) == 0 {
+		return "analysis is partial: this report is not authoritative"
+	}
+	return "PARTIAL ANALYSIS — " + strings.Join(parts, ", ") +
+		". Counts below are floors, not totals; this report is not authoritative."
 }
 
 // Summarise counts entities by coverage state for the report header. Reporting

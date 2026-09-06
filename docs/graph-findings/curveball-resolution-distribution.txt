@@ -1,0 +1,32 @@
+measured on entire-graph @ HEAD — relation resolution distribution
+
+   31487  exact
+    8217  import_external
+    7190  package
+    5186  name_only
+    4230  pattern
+    2552  type_inferred
+     738  import_resolved
+      57  git_history
+
+(resolution, confidence) pairs:
+   16727  exact            1
+    8217  import_external  0.78
+    7273  exact            0.92
+    5578  package          0.8
+    3619  exact            0.7
+    3118  exact            0.85
+    2196  name_only        0.8
+    2128  name_only        0.75
+    1411  package          0.7
+    1003  type_inferred    0.83
+     993  type_inferred    0.9
+     857  name_only        0.68
+     677  exact            0.75
+     449  pattern          0.92
+     419  pattern          0.91
+     395  pattern          0.95
+     385  pattern          0.94
+     332  type_inferred    0.85
+     317  pattern          0.89
+     314  import_resolved  0.85
