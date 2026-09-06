@@ -133,7 +133,8 @@ var inertLanguages = map[string]bool{
 
 	"JSON": true, "JSON5": true, "JSONC": true, "JSON Lines": true,
 	"YAML": true, "TOML": true, "INI": true, "CSV": true, "TSV": true,
-	"Properties": true, "Lock": true,
+	"Properties": true, "Lock": true, "EditorConfig": true,
+	"Pip Requirements": true, "Requirements": true,
 
 	"CSS": true, "SCSS": true, "Sass": true, "Less": true, "SVG": true,
 

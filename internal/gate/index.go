@@ -103,6 +103,7 @@ var entryPointRelations = map[string]string{
 // confident zero — the bug returning through the door the fix opened.
 var dynamicDispatchImports = map[string]string{
 	"reflect":                 "runtime reflection",
+	"reflect-metadata":        "runtime metadata reflection",
 	"importlib":               "dynamic import by name",
 	"inspect":                 "runtime introspection",
 	"pkgutil":                 "runtime package walking",
@@ -127,7 +128,16 @@ var dynamicDispatchImports = map[string]string{
 // will collide. "plugin" is an ordinary module name in many languages;
 // "importlib" and "java.lang.reflect" are not. Only distinctive names belong
 // here, and a new entry has to earn its place by being unlikely to name
-// something ordinary in another language.
+// something ordinary in another language. "reflect-metadata" qualifies on the
+// same test: nothing ordinary is named that.
+//
+// What this map cannot reach, measured on nestjs/nest: 8 files there import
+// reflect-metadata and are caught, but 95 reach the same facility through the
+// Reflect global, which is a JavaScript builtin requiring no import at all. No
+// IMPORTS edge exists, so no rule keyed on imports can see them. Nest is the
+// sharpest case of the builtin-dispatch limitation below, not an exception to
+// it: its whole dependency-injection model is decorator metadata resolved at
+// runtime, and Gate can only observe the eighth of it that announces itself.
 
 // KNOWN GAP, disclosed rather than papered over: this rule can only fire where
 // dynamic dispatch arrives through an import, because IMPORTS is the edge the

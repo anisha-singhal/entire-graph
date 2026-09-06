@@ -345,3 +345,61 @@ func TestACompleteAnalysisAddsNothingToTheReport(t *testing.T) {
 		t.Fatalf("a fully resolved repository gained output:\n%s", buf.String())
 	}
 }
+
+// Why the rationale clause is cut from the middle, not the end.
+//
+// Regression. The reason attached to a runtime-dispatch finding is one
+// sentence carrying three things: what was found, why it cannot be resolved,
+// and — crucially — that the number shown is a floor. A first version of
+// claim() cut the string at ", so " and kept only the head, which deleted the
+// floor phrase and left an unbalanced parenthesis:
+//
+//	dependents could not be resolved (this file imports importlib (dynamic import by name)
+//
+// The rationale is a clause in the middle of a sentence. It has to be removed
+// from the middle.
+func TestTheRationaleClauseIsRemovedWithoutLosingTheFloor(t *testing.T) {
+	reason := "function added: dependents could not be resolved (this file imports " +
+		"importlib (dynamic import by name), so its symbols can be invoked by name at " +
+		"runtime and an absent call edge is not evidence of an absent caller) — " +
+		"the 44 shown is a floor, not a count"
+
+	got := claim(reason)
+
+	if strings.Contains(got, ", so ") {
+		t.Fatalf("rationale survived:\n%s", got)
+	}
+	if !strings.Contains(got, "the 44 shown is a floor, not a count") {
+		t.Fatalf("the floor phrase is the point of the line and was lost:\n%s", got)
+	}
+	if !strings.Contains(got, "imports importlib (dynamic import by name)") {
+		t.Fatalf("the distinguishing half was lost:\n%s", got)
+	}
+	if strings.Count(got, "(") != strings.Count(got, ")") {
+		t.Fatalf("unbalanced parentheses:\n%s", got)
+	}
+
+	// A reason with no parenthetical loses only its trailing clause.
+	if got := claim("HTML is inventory-only, so a call from it would leave no edge"); got != "HTML is inventory-only" {
+		t.Fatalf("claim(inventory) = %q", got)
+	}
+	// A reason with no rationale is untouched.
+	const parse = "E_PARSE_ERROR: file parsed with syntax errors"
+	if got := claim(parse); got != parse {
+		t.Fatalf("claim(parse) = %q, want it unchanged", got)
+	}
+}
+
+// The verify line is a command to paste, not a place to restate the finding
+// printed two lines above it.
+func TestVerifyLineDropsTheCommentThatRepeatsTheSummary(t *testing.T) {
+	dup := `rg -n '\bqualname\b' -- '*'   # this file imports importlib (dynamic import by name), so its symbols can be invoked`
+	if got := command(dup); got != `rg -n '\bqualname\b' -- '*'` {
+		t.Fatalf("command() = %q, want the bare command", got)
+	}
+	// A comment carrying something the summary did not is kept.
+	keep := `rg -n '\bFoo\b' -g '*test*'   # a test the graph cannot resolve would not appear above`
+	if got := command(keep); got != keep {
+		t.Fatalf("command() dropped a comment that added information: %q", got)
+	}
+}

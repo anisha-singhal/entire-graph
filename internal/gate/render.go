@@ -146,9 +146,9 @@ func writeFindings(w io.Writer, findings []Finding) {
 			}
 			fmt.Fprintf(w, "  %s%s @ %s:%d%s\n",
 				f.Tier.Marker(), f.Subject.Name, f.Subject.Path, f.Subject.Line, label)
-			fmt.Fprintf(w, "    %s\n", stripTags(f.Summary))
+			fmt.Fprintf(w, "    %s\n", claim(stripTags(f.Summary)))
 			for _, e := range f.Evidence {
-				fmt.Fprintf(w, "      - %s\n", stripTags(e))
+				fmt.Fprintf(w, "      - %s\n", claim(stripTags(e)))
 			}
 			// A claim Gate cannot stand behind ships with the way to settle it.
 			// The tier no longer gates this: an absence claim needs a check
@@ -158,7 +158,7 @@ func writeFindings(w io.Writer, findings []Finding) {
 			// are unaffected, because Risk only attaches a hint when its own
 			// evidence is short of confirmed.
 			if f.Verify != "" {
-				fmt.Fprintf(w, "      verify: %s\n", stripTags(f.Verify))
+				fmt.Fprintf(w, "      verify: %s\n", command(stripTags(f.Verify)))
 			}
 		}
 	}
@@ -245,6 +245,9 @@ func dependentsPhrase(e ChangedEntity) string {
 // other section is bounded; the counts above it stay exact.
 const analysisPathLimit = 8
 
+// briefPathLimit bounds the least consequential group more tightly.
+const briefPathLimit = 3
+
 // NotAnalysedPrefix marks a partial-analysis reason as "the provider never
 // looked" rather than "the provider looked and failed". The collect layer
 // stamps it; writeAnalysis groups on it.
@@ -302,6 +305,61 @@ func stripTags(s string) string {
 	return s
 }
 
+// claim reduces a reason to the part that differs between findings, dropping
+// the rationale clause that follows ", so ".
+//
+// The rationale is identical everywhere it appears — "…, so its symbols can be
+// invoked by name at runtime and an absent call edge is not evidence of an
+// absent caller" is 104 characters and, on Django, printed more than twenty
+// times: once per risk finding, again inside each finding's verify comment, and
+// again beside each of 96 listed files. What actually varies is the four words
+// naming the module.
+//
+// So the clause is printed once, in the legend, and every site carries only its
+// distinguishing half. Nothing is withheld; the same sentence is simply not
+// repeated until a reader stops seeing it. Reasons with no ", so " are
+// unchanged, which covers every parse-failure message.
+// It excises the clause and keeps what follows it, which a first version did
+// not: cutting the string at ", so " also deleted the trailing
+// "— the 44 shown is a floor, not a count", the single most important phrase in
+// the line, and left the parentheses unbalanced. The rationale is a clause in
+// the middle of a sentence, so it has to be cut out of the middle.
+func claim(reason string) string {
+	i := strings.Index(reason, ", so ")
+	if i < 0 {
+		return strings.TrimSpace(reason)
+	}
+	// The clause runs to the close of the parenthetical it sits in; without
+	// one it runs to the end of the sentence.
+	if j := strings.Index(reason[i:], ")"); j >= 0 {
+		return strings.TrimSpace(reason[:i] + reason[i+j:])
+	}
+	return strings.TrimSpace(reason[:i])
+}
+
+// runtimeRationale is the clause claim() removes, stated once.
+const runtimeRationale = "a symbol reached by name at runtime leaves no call edge, " +
+	"so an absent edge here is not an absent caller"
+
+// command strips the trailing shell comment from a verify hint when that
+// comment merely restates the finding printed directly above it.
+//
+// The hint is built by attaching the reason as a "# …" comment, which is useful
+// in isolation and pure duplication in place: the same sentence appears two
+// lines earlier as the summary. What a reader needs from this line is the
+// command they can paste.
+func command(hint string) string {
+	head, comment, found := strings.Cut(hint, "   # ")
+	if !found {
+		return hint
+	}
+	// A comment that says something the summary did not is worth keeping.
+	if strings.Contains(comment, "would not appear above") {
+		return hint
+	}
+	return strings.TrimSpace(head)
+}
+
 // writeAnalysis prints what the graph could not see, and the legend that makes
 // the markers elsewhere in the report readable. It is skipped entirely when the
 // analysis is complete, so a fully resolved repository's output is unchanged.
@@ -322,52 +380,92 @@ func writeAnalysis(w io.Writer, a Analysis) {
 		return
 	}
 
-	var runtime, failed, notAnalysed []string
+	var runtime, failed, notAnalysed []partialPath
 	for i, path := range a.PartialPaths {
 		reason := ""
 		if i < len(a.Reasons) {
 			reason = a.Reasons[i]
 		}
-		trimmed := strings.TrimSpace(stripTags(reason))
-		line := path
-		if trimmed != "" {
-			line += " (" + trimmed + ")"
-		}
+		entry := partialPath{Path: path, Reason: claim(stripTags(reason))}
 		switch {
 		case strings.HasPrefix(reason, RuntimeDispatchPrefix):
-			runtime = append(runtime, line)
+			runtime = append(runtime, entry)
 		case strings.HasPrefix(reason, NotAnalysedPrefix):
-			notAnalysed = append(notAnalysed, line)
+			notAnalysed = append(notAnalysed, entry)
 		default:
-			failed = append(failed, line)
+			failed = append(failed, entry)
 		}
 	}
 
 	fmt.Fprintf(w, "\n  where the graph could not see:\n")
+	if len(runtime) > 0 {
+		fmt.Fprintf(w, "  (%s)\n", runtimeRationale)
+	}
 	// Ordered by how much each says about the change under review. Runtime
 	// dispatch leads: the code parsed, so this is the graph reporting the limit
 	// of what static analysis can know rather than a gap in what it read.
-	writePartialGroup(w, "parsed fine, but callers may be resolved at runtime", runtime)
-	writePartialGroup(w, "failed to parse", failed)
-	writePartialGroup(w, "never analysed for relations", notAnalysed)
+	writePartialGroup(w, "parsed fine, but callers may be resolved at runtime", runtime, analysisPathLimit)
+	writePartialGroup(w, "failed to parse", failed, analysisPathLimit)
+	// A tighter sample, not a suppressed one. This group is the least
+	// consequential of the three — the graph never looked, rather than looked
+	// and could not answer — but an inventory-only HTML or Vue file can still
+	// embed a call, so the paths are disclosed rather than reduced to a count.
+	// On Django the group is 393 files, which at the full cap buried the 96
+	// above it; three per reason keeps it honest and readable, and the count in
+	// each heading stays exact.
+	writePartialGroup(w, "never analysed for relations", notAnalysed, briefPathLimit)
 }
 
-// writePartialGroup prints one bounded, counted group of partial-analysis
-// paths. The heading carries the exact total, so the cap shortens the listing
-// without ever shortening the claim.
-func writePartialGroup(w io.Writer, title string, lines []string) {
-	if len(lines) == 0 {
+// partialPath is one file the graph could not fully see, with the condensed
+// reason it could not.
+type partialPath struct {
+	Path   string
+	Reason string
+}
+
+// writePartialGroup prints one bounded group of partial-analysis paths,
+// clustered by reason.
+//
+// Clustering is the difference between a section a reviewer reads and one they
+// scroll past. Django's runtime-dispatch group is 96 files carrying two
+// distinct reasons between them, so printed flat it was 96 lines that differed
+// only in the path — and the cap then hid 88 of them behind "... and 88 more",
+// which is the worst of both: long and incomplete. Grouped, it is two headings
+// with counts, and every path still fits under its own.
+//
+// The heading carries the exact total, so the cap shortens the listing without
+// ever shortening the claim.
+func writePartialGroup(w io.Writer, title string, paths []partialPath, perReason int) {
+	if len(paths) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "    %s (%d):\n", title, len(lines))
-	shown := lines
-	if len(shown) > analysisPathLimit {
-		shown = shown[:analysisPathLimit]
+	fmt.Fprintf(w, "    %s (%d):\n", title, len(paths))
+
+	byReason := map[string][]string{}
+	var order []string
+	for _, p := range paths {
+		if _, seen := byReason[p.Reason]; !seen {
+			order = append(order, p.Reason)
+		}
+		byReason[p.Reason] = append(byReason[p.Reason], p.Path)
 	}
-	for _, line := range shown {
-		fmt.Fprintf(w, "      - %s\n", line)
-	}
-	if rest := len(lines) - len(shown); rest > 0 {
-		fmt.Fprintf(w, "      ... and %d more\n", rest)
+	sort.Strings(order)
+
+	for _, reason := range order {
+		group := byReason[reason]
+		if reason == "" {
+			reason = "reason not stated"
+		}
+		fmt.Fprintf(w, "      %s — %d file(s):\n", reason, len(group))
+		shown := group
+		if len(shown) > perReason {
+			shown = shown[:perReason]
+		}
+		for _, path := range shown {
+			fmt.Fprintf(w, "        %s\n", path)
+		}
+		if rest := len(group) - len(shown); rest > 0 {
+			fmt.Fprintf(w, "        ... and %d more\n", rest)
+		}
 	}
 }
