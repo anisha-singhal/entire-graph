@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "f22292da4333",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "docs/graph-findings/capabilities.json",
+    "docs/graph-findings/orientation-01-semantic-diff.json",
+    "docs/graph-findings/orientation-02-subcommand-dispatch.json",
+    "docs/graph-findings/orientation-03-snapshot-relations.json",
+    "docs/graph-findings/relation-histogram.txt"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f2/2292da4333/0/metadata.json",
+      "transcript": "/f2/2292da4333/0/full.jsonl",
+      "compact_transcript": "/f2/2292da4333/0/transcript.jsonl",
+      "content_hash": "/f2/2292da4333/0/content_hash.txt",
+      "prompt": "/f2/2292da4333/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 48,
+    "cache_creation_tokens": 47800,
+    "cache_read_tokens": 5625821,
+    "output_tokens": 32569,
+    "api_call_count": 24
+  }
+}
