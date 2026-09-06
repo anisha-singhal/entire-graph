@@ -48,6 +48,75 @@
   "session_metrics": {
     "turn_count": 24
   },
+  "summary": {
+    "intent": "Build 'Gate', a CLI tool (entire graph gate) that analyzes changed code entities and outputs a keep/continue/revert verdict based on blast radius (dependents) and test coverage, ahead of a buildathon's noon checkpoint deadline — while keeping git history untouched until the user explicitly approves a commit.",
+    "outcome": "Gate was fully implemented (7 layers: collect, index, risk, coverage, verdict, render, CLI wiring) with 27 passing tests at ~79-80% coverage, a real correctness bug (DATA_FLOWS edge misinterpreted as dependency direction) found and fixed, gate --help registration bug found and fixed, PLAN.md HANDOFF and known-bugs sections written, and the user was walked through committing (with the Entire checkpoint linkage prompt) right at the noon deadline.",
+    "learnings": {
+      "repo": [
+        "DATA_FLOWS edges encode data direction (callee→caller when a return value propagates), not dependency direction — including it in a reversed dependents walk inflates dependent counts by making every callee look like a dependent of its caller.",
+        "The CLI has two parallel registries for commands: commandDocs (help text) and a dispatchCommands list used by TestRegistryMatchesDispatch; adding a new command to only the dispatch switch leaves --help broken even though the parity test still passes (both sides were missing it).",
+        "internal/gate is deliberately isolated from internal/sem (no import) so its tests need no git, tree-sitter, or CGO — enabling sub-second synthetic-fixture tests.",
+        "mise run test fails because mise isn't on PATH in this shell; the equivalent is GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null go test -timeout 30m ./... (avoids fixture commits inheriting user git config, cutting dependents tests from 27s to 0.3s).",
+        "Companion (SIMILAR_TO, 3,479 edges) and clone (FILE_CHANGES_WITH, 57 edges) signals are already loaded in the snapshot collect loop, so adding those checks is cheap (~40 lines each) if time allows.",
+        "committing via git triggers an 'Entire: Active Claude Code session detected — Link this commit to session context?' prompt that adds an Entire-Checkpoint trailer (not an AI-attribution trailer); answering 'n' means no checkpoint is created."
+      ],
+      "code": [
+        {
+          "path": "internal/gate/index.go",
+          "line": 1,
+          "finding": "Reverse-dependency index construction originally included DATA_FLOWS relations, which have data-direction not dependency-direction semantics; removing it fixed inflated dependent counts (e.g. runStats 156→130, receiverCallRelations 6→4) and duplicate entries."
+        },
+        {
+          "path": "internal/cli/help.go",
+          "line": 483,
+          "finding": "commandDocs registry lacked a gate entry, so `gate --help` failed even after gate was added to the CLI dispatch switch."
+        },
+        {
+          "path": "internal/cli/help_test.go",
+          "line": 14,
+          "finding": "TestRegistryMatchesDispatch compares commandDocs against a hand-maintained dispatchCommands list; it only catches missing commands if they're on one side but not the other — gate was missing from both, so the test passed despite the bug."
+        },
+        {
+          "path": "internal/sem/analyze.go",
+          "line": 1250,
+          "finding": "Rename reconciliation iterates a map, making change_type flip between added/renamed nondeterministically across runs — verdict stays stable but JSON output bytes are not identical run-to-run. Documented as a known upstream bug, not fixed."
+        },
+        {
+          "path": "internal/cli/root.go",
+          "line": 76,
+          "finding": "Gate command wiring touchpoint (dispatch registration) — one of three places (with help.go and main.go:23) that must be updated together when adding a CLI subcommand."
+        }
+      ],
+      "workflow": [
+        "When a user says 'undo the commits but keep my changes,' record the commit SHAs (and any tool-specific checkpoint bindings) before doing `git reset --soft`, since that reset silently detaches things like checkpoint links bound to those commits — surface that side effect proactively rather than letting the user discover it later.",
+        "When asked to fix a bug found in tool output, verify the root cause against the underlying data model (e.g. checking the exact 'reason' string on a graph edge) before patching, rather than assuming the fix from the symptom alone.",
+        "Before writing a batch of tests, name each test for the *behavior/reasoning* it pins (e.g. 'why a missing dimension can't manufacture a revert') rather than the implementation, so a failure explains what broke.",
+        "A HANDOFF/PLAN doc written for session-boundary continuity should explicitly record deviations from the original plan (e.g. coverage computed graph-derived instead of via SearchRepository) so a fresh reader doesn't assume the code is wrong.",
+        "Explaining technical architecture in very simple analogies (LEGO castle) and in mixed Hindi/English per user request was effective for a non-technical/quick-scan progress check."
+      ]
+    },
+    "friction": [
+      "User had to explicitly and repeatedly remind the assistant not to commit without permission; the checkpoint system's dependency on commits created urgent pressure (a 'pre-noon checkpoint' deadline) that nearly conflicted with that constraint.",
+      "Soft-resetting two commits detached their bound 'Entire checkpoint' entries, reducing entire checkpoint list to 0 with a hard deadline looming, requiring careful recovery guidance (reflog SHAs).",
+      "`mise run test` failed silently because mise wasn't on PATH, requiring workaround discovery via manual env vars.",
+      "`gate --help` was broken due to an incomplete registry update, and the existing parity test gave false confidence because both sides of the comparison were incomplete.",
+      "A real correctness bug (DATA_FLOWS misdirection) was already present in demo-facing output before the user ran it on real data and it was caught only because the assistant scrutinized the output rather than trusting it.",
+      "Test coverage dipped 80.6%→78.9% after bug-fix code (dedupe, warning-collapse) was added without accompanying tests, an explicitly flagged but still-open gap.",
+      "The user's commit hit an interactive 'Entire: Active Claude Code session detected' prompt asking whether to link the commit to session context, which needed on-the-spot clarification (it's a checkpoint ID trailer, not an AI-attribution/Co-Authored-By line) right at the noon deadline."
+    ],
+    "open_items": [
+      "Nothing was committed as of the last message in the transcript; user was mid-way through the `git commit` + Entire linkage prompt + `entire checkpoint list` verification when the transcript ends.",
+      "`git push origin` to reach the mirror for judges was still pending.",
+      "No unit tests written yet for the dedupe-by-location and warning-collapse-by-code fixes (coverage regression from 80.6% to 78.9%).",
+      "Companion gap detection (SIMILAR_TO) and clone drift detection (FILE_CHANGES_WITH) not implemented (~40 lines each, data already loaded).",
+      "Pre-push hook for the live demo not implemented (~5 lines).",
+      "`--explain` flag to show the full dependency chain not implemented (~50 lines).",
+      "Upstream nondeterminism bug in internal/sem/analyze.go:1250 (map iteration causing added/renamed flip) remains unfixed and undisclosed upstream — documented in PLAN.md with instruction not to claim byte-identical output until addressed.",
+      "TESTS constant reported as unused (9/11,397) and verifyCommand returning a suite-level command instead of a narrow one — noted as known minor issues, not fixed.",
+      "BUILDATHON.md submission doc still needs the required AI-agent-usage disclosure line added (assistant flagged this as non-optional but it wasn't done in-session).",
+      "User's ~130-dependents figure for runStats was flagged by the assistant as worth spot-checking against source before presenting to judges, but this verification was not completed in the transcript."
+    ]
+  },
   "initial_attribution": {
     "calculated_at": "2026-09-06T06:27:13.17174Z",
     "agent_lines": 741,
