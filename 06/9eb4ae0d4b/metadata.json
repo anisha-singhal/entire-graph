@@ -3,7 +3,7 @@
   "checkpoint_id": "069eb4ae0d4b",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 18,
+  "checkpoints_count": 21,
   "files_touched": [
     "BUILDATHON.md",
     "docs/testing-gate-on-any-repo.md",
@@ -33,6 +33,13 @@
       "compact_transcript": "/06/9eb4ae0d4b/2/transcript.jsonl",
       "content_hash": "/06/9eb4ae0d4b/2/content_hash.txt",
       "prompt": "/06/9eb4ae0d4b/2/prompt.txt"
+    },
+    {
+      "metadata": "/06/9eb4ae0d4b/3/metadata.json",
+      "transcript": "/06/9eb4ae0d4b/3/full.jsonl",
+      "compact_transcript": "/06/9eb4ae0d4b/3/transcript.jsonl",
+      "content_hash": "/06/9eb4ae0d4b/3/content_hash.txt",
+      "prompt": "/06/9eb4ae0d4b/3/prompt.txt"
     }
   ],
   "token_usage": {
