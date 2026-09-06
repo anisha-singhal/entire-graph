@@ -3,7 +3,7 @@
   "checkpoint_id": "069eb4ae0d4b",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 8,
+  "checkpoints_count": 18,
   "files_touched": [
     "BUILDATHON.md",
     "docs/testing-gate-on-any-repo.md",
@@ -26,13 +26,20 @@
       "compact_transcript": "/06/9eb4ae0d4b/1/transcript.jsonl",
       "content_hash": "/06/9eb4ae0d4b/1/content_hash.txt",
       "prompt": "/06/9eb4ae0d4b/1/prompt.txt"
+    },
+    {
+      "metadata": "/06/9eb4ae0d4b/2/metadata.json",
+      "transcript": "/06/9eb4ae0d4b/2/full.jsonl",
+      "compact_transcript": "/06/9eb4ae0d4b/2/transcript.jsonl",
+      "content_hash": "/06/9eb4ae0d4b/2/content_hash.txt",
+      "prompt": "/06/9eb4ae0d4b/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 90,
-    "cache_creation_tokens": 144986,
-    "cache_read_tokens": 8190264,
-    "output_tokens": 83034,
-    "api_call_count": 45
+    "input_tokens": 178,
+    "cache_creation_tokens": 221310,
+    "cache_read_tokens": 23475892,
+    "output_tokens": 121692,
+    "api_call_count": 89
   }
 }

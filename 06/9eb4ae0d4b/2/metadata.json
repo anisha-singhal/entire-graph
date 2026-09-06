@@ -1,0 +1,158 @@
+{
+  "cli_version": "0.10.5",
+  "checkpoint_id": "069eb4ae0d4b",
+  "session_id": "a79cd0c7-14b7-4626-9148-4b469d0a9e47",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-06T09:23:15.194841Z",
+  "branch": "main",
+  "checkpoints_count": 10,
+  "save_step_count": 8,
+  "files_touched": [
+    "BUILDATHON.md",
+    "docs/testing-gate-on-any-repo.md",
+    "internal/gate/changeset.go",
+    "internal/gate/changeset_test.go",
+    "internal/gate/index.go",
+    "internal/gate/render.go"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "b0e907974ad5",
+  "checkpoint_transcript_start": 783,
+  "transcript_lines_at_start": 783,
+  "compact_transcript_start": 166,
+  "token_usage": {
+    "input_tokens": 88,
+    "cache_creation_tokens": 76324,
+    "cache_read_tokens": 15285628,
+    "output_tokens": 38658,
+    "api_call_count": 44
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-fast-2026-09-06T08:44:27.309944Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "fast"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "a012aac218bf",
+      "timestamp": "2026-09-06T08:44:27.309944Z",
+      "native": {
+        "command": "/fast"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/fast",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 16
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-06T09:23:15.088489Z",
+    "agent_lines": 830,
+    "agent_removed": 272,
+    "human_added": 15,
+    "human_modified": 3,
+    "human_removed": 0,
+    "total_committed": 848,
+    "total_lines_changed": 1120,
+    "agent_percentage": 98.39285714285714,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 134,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "scripts/gate-demo-flask.sh": 46,
+        "scripts/gate-demo-repo.sh": 88
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 653,
+      "agent_lines_removed": 244
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1366,
+      "agent_lines_removed": 245
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 6,
+      "user_lines_removed": 1,
+      "agent_lines_added": 1495,
+      "agent_lines_removed": 245,
+      "user_added_per_file": {
+        "docs/testing-gate-on-any-repo.md": 6
+      },
+      "user_removed_per_file": {
+        "docs/testing-gate-on-any-repo.md": 1
+      }
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 6,
+      "user_lines_removed": 1,
+      "agent_lines_added": 1495,
+      "agent_lines_removed": 245,
+      "user_added_per_file": {
+        "docs/testing-gate-on-any-repo.md": 6
+      },
+      "user_removed_per_file": {
+        "docs/testing-gate-on-any-repo.md": 1
+      }
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 6,
+      "user_lines_removed": 1,
+      "agent_lines_added": 1495,
+      "agent_lines_removed": 245,
+      "user_added_per_file": {
+        "docs/testing-gate-on-any-repo.md": 6
+      },
+      "user_removed_per_file": {
+        "docs/testing-gate-on-any-repo.md": 1
+      }
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1553,
+      "agent_lines_removed": 275
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1553,
+      "agent_lines_removed": 275
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1553,
+      "agent_lines_removed": 275
+    }
+  ]
+}
