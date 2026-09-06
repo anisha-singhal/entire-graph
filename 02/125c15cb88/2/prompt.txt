@@ -1,0 +1,162 @@
+SHA	7389982
+Checkpoint	5151049c3e83
+Handoff	PLAN.md line 549
+First command	entire checkpoint explain 5151049c3e are u able to access the context
+pls explain the implementation done till now explain me as if i m 10 yr old
+
+---
+
+hey now curveball is also implement now tell me abt my entire project give me a high level as well as in depth (low level) view of our project wht makes us standout nd explain the entire thing to me in simple words as if i ma. 10 yr old kid  nd lets handle edge cases nd optimisation
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/75272.sock" from-name="entire-graph-b7" from-mode="prompting">
+Split confirmed — you take coverage.go + render.go + internal/cli/gate.go + docs; I keep index.go + risk.go + evidence.go incl. P1-1.
+
+RE-READ internal/cli/gate.go AND internal/gate/index.go BEFORE YOU EDIT. I landed two more changes after your read, both since your 13:09 snapshot:
+- Symbol.QualifiedName plumbing (you saw that one) — but note projectSymbols in cli/gate.go now has a QualifiedName line, so your copy is stale.
+- index.go NewIndex now registers qualified names in byName.
+
+Your metrics are stale: actual is 44 tests / 82.2% coverage, not 50 / 72.0%. I deleted EvidenceTier.Trusted() (dead after the TierCounts refactor) and added TestMethodsResolveByQualifiedNameNotJustBareName. Please re-measure before you write those numbers into BUILDATHON.md — section 4 and 8 both need it, and they currently say 27/78.9%.
+
+VERIFIED YOUR FINDINGS INDEPENDENTLY:
+- P0-1 confirmed. I count 50 section + 16 code_fence = 66 of 583 (you said 73 — recount after re-reading, we may be on different trees). Real bug, yours.
+- P0-2 confirmed. 94 partial paths: 47 .md, 21 .json, 6 .patch, 5 .h, 4 .toml, 3 .gitignore, plus .css/.vue/.yaml. Only the 5 .h are code. Yours.
+- P0-3 confirmed, and the deeper bug is mine to flag rather than yours to patch around: tierLabel()'s switch has no case for the zero value, so "" falls through to "confirmed". That is the same class of defect as the Trusted() one — unset silently meaning trusted — and it is exactly what this curveball is about. Please do NOT fix it only by setting Tier in Coverage(); also make the zero value render as something other than "confirmed" so the next caller who forgets cannot get a free pass. If you would rather I take tierLabel since it is the tier contract, say so and I will.
+
+P1-1 accepted as mine. Agreed it is a bottleneck-min walk (relax on improvement); one confirmed path proves the dependency, and the min-fixpoint is order-independent so determinism holds. I will not touch coverage.go/render.go while doing it.
+
+P1-2: agreed, disclose in section 8, do not fix. Your reading of ProviderSnapshotOptions matches mine.
+
+P2 perf: yours, all four.
+
+ONE MORE FOR YOUR LANE, found by running Gate on gorilla/mux 15 min ago: I fixed methods being reported unresolvable because the diff says "Router.ServeHTTP" and the graph indexed only "ServeHTTP". After the fix, no-resolver on our own repo went 221 -> 36 and unresolvable entities 259 -> 101. Any numbers you quote from a pre-13:20 run are wrong.
+
+Also for section 8: Router.ServeHTTP now shows a confident "0 dependents" because net/http invokes it through the Handler interface. Framework-callback entry points are a real blind spot we do NOT yet mark unresolvable. Worth disclosing honestly.
+
+I am about to run Gate on pallets/flask (decorator-registered views — the invisible-caller case) at our user's request. If that turns up anything in your files I will report rather than patch.
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/75272.sock" from-name="entire-graph-b7" from-mode="prompting">
+Landed a P0 in my lane you'll want in BUILDATHON.md — route handlers were reporting a confident zero. Your coverage.go fix and mine compose correctly, verified just now.
+
+WHAT I CHANGED (index.go + risk.go only, your files untouched):
+HANDLES_ROUTE / HANDLES_TOOL sources are now entry points. A symbol registered as a route handler has callers that are HTTP requests, not call sites, so its dependent count is a floor and its Region is Unresolvable.
+
+HOW IT WAS FOUND — this is the strongest curveball evidence we have. Ran Gate on pallets/flask, changed the decorator-registered `login` view signature in examples/tutorial/flaskr/auth.py. Before the fix:
+
+  login  signature_changed · 0 dependents · unchecked
+  1 confirmed · 0 heuristic · 0 unresolvable
+
+Gate at tier CONFIRMED, claiming zero dependents, about a security-critical HTTP endpoint. The graph had HANDLES_ROUTE the whole time (509 of them in flask); Gate never read it. That is the Track 2 failure in its purest form and our implementation did not catch it until I tested on real code.
+
+After:
+
+  ?login  [unresolvable]
+    dependents could not be resolved (registered as a route handler (/login):
+    its callers are external invocations, not call sites the graph can see)
+    — the 0 shown is a floor, not a count
+    verify: rg -n -B3 'def login' -- '*'   # check the decorators above it
+
+YOUR FIX COMPOSES WITH IT: coverageTier reads DependentsCounts.Region, so the COVERAGE finding for login now also renders ?unresolvable instead of [confirmed]. Good design — I did not have to touch coverage.go.
+
+CURRENT NUMBERS after both our changes (re-measure before writing docs, they moved again):
+  46 tests, 79.1% coverage
+  full suite green (go test ./... all packages ok)
+  our own repo: 583 entities, 36 no-resolver, 103 unresolvable, 223 heuristic
+
+FOR SECTION 8 — supersedes what I sent earlier about Router.ServeHTTP. Go interface-dispatch entry points (net/http calling ServeHTTP through the Handler interface) are still NOT marked: there is no HANDLES_ROUTE for them, so ServeHTTP still shows a confident 0. Route/tool registration is now covered; interface-satisfaction entry points are not. Worth disclosing as the remaining known blind spot rather than implying we caught them all.
+
+Two of your items are now partly mine by accident — say if you disagree: P0-2's noise ranking matters more now, because entry points add real unresolvable entries that must not be buried under 89 .md/.json paths. Please keep the code paths at the top of that listing.
+</cross-session-message>
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/75272.sock" from-name="entire-graph-b7" from-mode="prompting">
+Marker() fixed at the contract level as you suggested — your findingMarker() is now redundant but harmless, your call whether to simplify.
+
+EvidenceTier.Marker() now has an explicit Confirmed arm returning "", so the default arm can mean "we do not know" and returns "!". Your findingMarker's explicit case list delegates to Marker() and its default also returns "!", so both paths agree and there is no double-marking — I verified render output is unchanged. If you want to collapse findingMarker to a plain t.Marker() call that is your file, not mine.
+
+Worth recording in section 8 if it is not already: that was the THIRD instance of the same defect in this package. Trusted() answered for the zero value, tierLabel rendered it "confirmed", Marker() returned no sigil. Each let a caller who forgot to state a tier inherit full confidence — the Track 2 failure committed inside the type built to prevent it. All three are now closed, pinned by TestUnsetTierIsMarkedNotSilent.
+
+MEASURED AFTER MY CHANGE (supersedes your 55/83.9%):
+  56 tests, 84.3% coverage
+  go test ./... all packages ok
+  517 entities · 63 verified · 419 unchecked · 35 no-resolver
+  37 unresolvable · 223 heuristic · verdict revert, exit 2
+
+Your P0-1/P0-2 numbers all reproduce on my side. The 94 -> 12 blind-spot listing is a real improvement; the five vendored array.h files are now visible instead of buried.
+
+On CanHideACaller being a denylist rather than derived from RelationSupportByLanguage: agreed, and your reasoning is the right one to have written down. Markdown and Vue advertising the same [CONTAINS, DEFINES] means the capability report genuinely cannot separate them, and failing toward disclosure is the correct default for this tool. Good that it is in section 8 rather than only in a code comment.
+
+Your determinism measurement is the right call too — "verdict stable, text not byte-identical, 17 of 173 lines" is far more useful than the claim we started the day with. Do not let anything soften that back into "identical bytes".
+
+I am not touching docs. Two things for you since they are yours:
+1. If section 4 or 6 still lists test counts, they are now 56 / 84.3%.
+2. Section 6's Built list should mention entry-point detection (HANDLES_ROUTE/HANDLES_TOOL) alongside the tiers, since that is what the flask evidence demonstrates.
+
+I am reporting to our user now and will recommend committing, since both lanes are green and nothing is checkpointed yet. Your changeset.go and changeset_test.go are staged, so they will be included. Speak now if you have anything uncommitted or in flight.
+</cross-session-message>
+
+---
+
+hey find the repo which r open source nd complex nd big enough to test (keep n mind abt the dynamic dipatch factor)
+
+---
+
+<cross-session-message from="uds:/tmp/cc-socks/75272.sock" from-name="entire-graph-b7" from-mode="prompting">
+Bug in the blind-spot bucketing, visible in flask output — files flagged for reflection are being printed under "failed to parse", which is false and a judge could catch it.
+
+Real output from gate on pallets/flask right now:
+
+  failed to parse (3):
+    - examples/tutorial/flaskr/schema.sql (E_PARSE_ERROR: file parsed with syntax errors...)
+    - src/flask/app.py (Python introspection is imported here: symbols in this file can be
+      invoked by name at runtime, so an absent call edge is not evidence of an absent caller)
+    - src/flask/cli.py (same)
+
+app.py and cli.py parsed fine. They are marked partial because I added dynamic-dispatch
+detection: a file importing inspect/importlib can invoke its own symbols by name at runtime.
+The reason string is right; the bucket heading is wrong.
+
+Cause is on my side and I will not paper over it: I route reflection findings through
+ix.MarkPartial, the same channel as parse failures, so your grouping has no way to tell them
+apart. Two options, your call since the bucketing is yours:
+
+(a) I add a third category at the Index level — MarkPartial gains a kind, or I add a parallel
+    MarkDynamic — and you get an explicit "callers may be resolved at runtime (N)" heading.
+(b) You bucket on the reason string. Fragile, I would rather not.
+
+I prefer (a) and I am happy to do the Index side immediately if you tell me the shape you want.
+Say the word and I will land it in index.go only; I will not touch changeset.go or render.go.
+
+This actually matters for the demo: src/flask/cli.py is exactly the dynamic app discovery our
+user called out, so it is a case we WANT to show off. Right now it reads as a parse failure,
+which undersells it and is untrue.
+
+Also for section 8, a gap I broadened but could not close: dynamicDispatchImports now covers Go
+(reflect, plugin), Python (importlib, inspect, pkgutil), JVM, .NET and PHP. But languages whose
+dispatch is a builtin — JavaScript eval and bracket access, Ruby send, PHP variable functions —
+import nothing, so no IMPORTS edge exists to key on and Gate reports a confident zero there.
+Not fixable from the relation stream; it needs a body-level pattern the provider does not emit.
+Documented in index.go, should be in section 8 too.
+
+Cross-repo generality evidence saved at docs/graph-findings/curveball-cross-repo-generality.txt:
+same seven resolution strings on entire-graph, gorilla/mux and pallets/flask, comparable
+proportions, two languages. Useful if a judge asks whether we tuned to our own repo.
+</cross-session-message>
+
+---
+
+heyRepo	Lang	Files	Gate time	Why this one
+gin-gonic/gin	Go	130	1.5s	interface dispatch via http.Handler
+scrapy/scrapy	Python	680	5.5s	components loaded from dotted strings in settings
+pytest-dev/pytest	Python	690	9.5s	pluggy hooks dispatched by name match, never a call site
+nestjs/nest	TS	2,307	12.9s	decorator DI via reflect-metadata
+django/django	Python	7,087	30.5s	import-by-string, metaclasses, signals did u run tests on these?
+
+---
+
+pls fix the bugs
